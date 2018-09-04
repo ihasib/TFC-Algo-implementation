@@ -56,6 +56,53 @@ void TfcStart(float polyRefractiveIndex, float polyThickness, int spectroResolut
 
     WarpSignalGraph( polyThickness,armLength,spectroResolution,polyRefractiveIndex,X,Y,lambdaMin,lambdaMax );
 
+    float *k,*Fx,mxK=1/X[0];// 1/X[0]=k[0]
+    float mnK=mxK;
+
+    k=new float[spectroResolution];
+    Fx=new float[spectroResolution];
+
+    for(int i=0;i<spectroResolution;i++)
+    {
+        k[i]=1/X[i];    //K space x axis
+
+        if(mxK<k[i])
+            mxK=k[i];
+        else if(mnK>k[i])
+            mnK=k[i];
+    }
+
+    float deltaFx=0.5/(mxK-mnK); // Fourier transform spectrum resolution
+    //cout<<deltaFx<<"\n";
+
+    Fx[0]=0.0;
+    //for(float i=0.0;i<=(spectroResolution-1)*deltaFx;i=i+deltaFx)
+    for(int indx=1;indx<spectroResolution;indx++)
+    {
+        Fx[indx]=Fx[indx-1]+deltaFx;
+    }
+
+
+    FILE *fl=fopen("Fx.txt","w");
+    for(int i=0;i<spectroResolution;i++)
+    {
+        fprintf(fl,"Fx[%d]=%lf\n",i,Fx[i]);
+    }
+    fclose(fl);
+
+    /*FILE *f=fopen("X_Y.txt","w");
+    for(int i=0;i<spectroResolution;i++)
+    {
+        fprintf(f,"X[%d]=%lf\tY[%d]=%lf\n",i,X[i],i,Y[i]);
+    }
+    fclose(f);*/
+
+    FILE *f=fopen("K.txt","w");
+    for(int i=0;i<spectroResolution;i++)
+    {
+        fprintf(f,"K[%d]=%.8lf\n",i,k[i]);
+    }
+    fclose(f);
     return;
 }
 
@@ -75,7 +122,7 @@ void WarpSignalGraph( float polyThickness,float armLength,int spectroResolution,
     {
         X[i] = 1/(kmax-(i+1-1)*deltak); // K space X axis //since our's is 0 indexed
         Y[i] = WarpSignal( X[i],armLength,polyThickness,polyRefractiveIndex); // Intensity
-        cout<<"X["<<i<<"] = "<<X[i]<<"\tY["<<i<<"] = "<<Y[i]<<"\n";
+        //cout<<"X["<<i<<"] = "<<X[i]<<"\tY["<<i<<"] = "<<Y[i]<<"\n";
     }
     //cout<<kmax<<" "<<kmin<<" "<<deltak;
 }
