@@ -71,10 +71,11 @@ void WarpSignalGraph( float polyThickness,float armLength,int spectroResolution,
     float deltak=(kmax-kmin)/(spectroResolution-1); // Wavenumber spacing
 
 
-    for(int i=0;i<1/*spectroResolution*/;i++)
+    for(int i=0;i<spectroResolution;i++)
     {
         X[i] = 1/(kmax-(i+1-1)*deltak); // K space X axis //since our's is 0 indexed
         Y[i] = WarpSignal( X[i],armLength,polyThickness,polyRefractiveIndex); // Intensity
+        cout<<"X["<<i<<"] = "<<X[i]<<"\tY["<<i<<"] = "<<Y[i]<<"\n";
     }
     //cout<<kmax<<" "<<kmin<<" "<<deltak;
 }
@@ -83,10 +84,23 @@ void WarpSignalGraph( float polyThickness,float armLength,int spectroResolution,
 
 float WarpSignal( float lambda,float armLength,float polyThickness,float polyRefractiveIndex)
 {
-    float _Complex **T;
+    float _Complex **T,Rtemp;
+    float pi=3.1416;
     T=TransferFunctionPolyCu( lambda,polyThickness,polyRefractiveIndex );//lambda=X[i]
-    //Rtemp = T(2,1)/T(1,1); // Reflected R = T_out/T_In
-    return 6.0;
+    Rtemp = T[1][0]/T[0][0]; // Reflected R = T_out/T_In
+
+    float TwoPhi=2*2*pi*armLength/lambda;//phase
+    float _Complex TempSignal = 0.5*(cexp(1i*TwoPhi)+Rtemp); // electrical field
+
+    //float _Complex Signal = TempSignal*conj(TempSignal); // Intensity abs(E)^2;
+    float  Signal = creal( TempSignal*conj(TempSignal) ); // Intensity abs(E)^2;
+    /*cout<<"\n\nRtemp = "<<creal(Rtemp)<<" "<<cimag(Rtemp)<<"\n";
+    cout<<TwoPhi<<"\n";
+    cout<<"\n\nT signal = "<<creal(TempSignal)<<" "<<cimag(TempSignal)<<"\n";
+    //cout<<"\n\nsignal = "<<creal(Signal)<<" "<<cimag(Signal)<<"\n";
+    cout<<"\n\nsignal = "<<Signal<<"\n";
+    */
+    return Signal;
 }
 
 
@@ -149,19 +163,10 @@ float _Complex** TransferFunctionPolyCu( float lambda,float polyThickness,float 
 
     int noOfRowsMat1=2,noOfColsMat1=2,noOfRowsMat2=2,noOfColsMat2=2;
     T=matrixMultiplication(T12,T2,noOfRowsMat1,noOfColsMat1,noOfRowsMat2,noOfColsMat2);
-    cout<<"\n\n T\n";
-    for(int i=0;i<noOfRows;i++)
-    {
-        for(int j=0;j<noOfCols;j++)
-        {
-            cout<<creal(T[i][j])<<" + "<<cimag(T[i][j])<<"i"<<"\t";
-        }
-        cout<<"\n";
-    }
     T=matrixMultiplication(T,T23,noOfRowsMat1,noOfColsMat1,noOfRowsMat2,noOfColsMat2);
 
 
-    cout<<"\n\n T\n";
+    /*cout<<"\n\n T\n";
     for(int i=0;i<noOfRows;i++)
     {
         for(int j=0;j<noOfCols;j++)
@@ -169,7 +174,7 @@ float _Complex** TransferFunctionPolyCu( float lambda,float polyThickness,float 
             cout<<creal(T[i][j])<<" + "<<cimag(T[i][j])<<"i"<<"\t";
         }
         cout<<"\n";
-    }
+    }*/
     return T;
 }
 
