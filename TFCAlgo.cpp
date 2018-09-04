@@ -1,8 +1,13 @@
 #include<bits//stdc++.h>
+#include<complex.h>
 using namespace std;
 
 void TfcStart(float polyRefractiveIndex, float polyThickness, int spectroResolution, float lambdaMax, float lambdaMin);
 void WarpSignalGraph( float polyThickness,float armLength,int spectroResolution, float polyRefractiveIndex,float *X, float *Y, float lambdaMin, float lambdaMax );
+float WarpSignal( float lambda,float armLength,float polyThickness,float polyRefractiveIndex);
+float _Complex** TransferFunctionPolyCu( float lambda,float polyThickness,float polyRefractiveIndex);
+float _Complex** matrixMultiplication(float _Complex** mat1, float _Complex** mat2, int noOfRowsMat1, int noOfColsMat1, int noOfRowsMat2, int noOfColsMat2);
+float _Complex RefractiveIndexCu(float lambda);
 
 //#define MAX
 
@@ -66,16 +71,153 @@ void WarpSignalGraph( float polyThickness,float armLength,int spectroResolution,
     float deltak=(kmax-kmin)/(spectroResolution-1); // Wavenumber spacing
 
 
-    for(int i=0;i<spectroResolution;i++)
+    for(int i=0;i<1/*spectroResolution*/;i++)
     {
-        X[i] = 1/(kmax-(i-1)*deltak); // K space X axis
+        X[i] = 1/(kmax-(i+1-1)*deltak); // K space X axis //since our's is 0 indexed
         Y[i] = WarpSignal( X[i],armLength,polyThickness,polyRefractiveIndex); // Intensity
     }
-    cout<<kmax<<" "<<kmin<<" "<<deltak;
+    //cout<<kmax<<" "<<kmin<<" "<<deltak;
 }
 
-void WarpSignal( X[i],armLength,polyThickness,polyRefractiveIndex)
+
+
+float WarpSignal( float lambda,float armLength,float polyThickness,float polyRefractiveIndex)
+{
+    float _Complex **T;
+    T=TransferFunctionPolyCu( lambda,polyThickness,polyRefractiveIndex );//lambda=X[i]
+    //Rtemp = T(2,1)/T(1,1); // Reflected R = T_out/T_In
+    return 6.0;
+}
+
+
+
+// T is 2x2 matrix
+float _Complex** TransferFunctionPolyCu( float lambda,float polyThickness,float polyRefractiveIndex)
+{
+    int rows=2,colms=2;
+
+    float _Complex nc = RefractiveIndexCu(lambda);
+
+    //--------------------------------------------------
+    float pi=3.1416;
+    float Phi = 2*pi*polyRefractiveIndex*polyThickness/lambda;
+    float r12 = (1.0-polyRefractiveIndex)/(1.0+polyRefractiveIndex);
+    float t12 = 1.0 + r12;
+
+    /*cout<<"Lambda="<<lambda<<"\n";
+    cout<<"phi="<<Phi<<"\n";
+    cout<<"r12 = "<<r12<<"\n";*/
+    //TODO
+    float _Complex r23 = (polyRefractiveIndex-nc)/(polyRefractiveIndex+nc);//complex add
+    float _Complex t23 = 1 + r23;//complex add
+
+    //array declarartion  for matrix multiplication
+    float _Complex **T2, **T23, **T,**T12;
+
+    // array size definition
+    T12=new float _Complex*[rows];
+    T2=new float _Complex*[rows];
+    T23=new float _Complex*[rows];
+
+    for(int i=0;i<rows;i++)
+    {
+        T12[i]=new float _Complex[colms];
+        T2[i]=new float _Complex[colms];
+        T23[i]=new float _Complex[colms];
+    }
+
+    int noOfRows=2,noOfCols=2;
+
+    for(int i=0;i<noOfRows;i++)
+    {
+        for(int j=0;j<noOfCols;j++)
+        {
+            T12[i][j]=1/t12;
+            T2[i][j]=0;
+            T23[i][j]=1/t23;
+        }
+    }
+
+    T12[0][1] = r12*T12[0][1];//real
+    T12[1][0] = r12*T12[1][0];//real
+
+    T2[0][0] = cexp(I*Phi);//complex
+    T2[1][1] = cexp(-I*Phi);//complex
+
+    T23[0][1] = r23*T23[0][1];//complex r23
+    T23[1][0] = r23*T23[1][0];//complex r23
+
+    int noOfRowsMat1=2,noOfColsMat1=2,noOfRowsMat2=2,noOfColsMat2=2;
+    T=matrixMultiplication(T12,T2,noOfRowsMat1,noOfColsMat1,noOfRowsMat2,noOfColsMat2);
+    cout<<"\n\n T\n";
+    for(int i=0;i<noOfRows;i++)
+    {
+        for(int j=0;j<noOfCols;j++)
+        {
+            cout<<creal(T[i][j])<<" + "<<cimag(T[i][j])<<"i"<<"\t";
+        }
+        cout<<"\n";
+    }
+    T=matrixMultiplication(T,T23,noOfRowsMat1,noOfColsMat1,noOfRowsMat2,noOfColsMat2);
+
+
+    cout<<"\n\n T\n";
+    for(int i=0;i<noOfRows;i++)
+    {
+        for(int j=0;j<noOfCols;j++)
+        {
+            cout<<creal(T[i][j])<<" + "<<cimag(T[i][j])<<"i"<<"\t";
+        }
+        cout<<"\n";
+    }
+    return T;
+}
+
+//input: takes matrix 1 and 2 and their number of rows and columns
+//output: multiplied matrix
+float _Complex** matrixMultiplication(float _Complex** mat1, float _Complex** mat2, int noOfRowsMat1, int noOfColsMat1, int noOfRowsMat2, int noOfColsMat2)
 {
 
+    float _Complex** multiMatrix;
+
+    multiMatrix=new float _Complex *[noOfRowsMat1];
+
+    for(int i=0;i<noOfRowsMat1;i++)
+    {
+        multiMatrix[i]=new float _Complex [noOfColsMat2];
+    }
+
+    //reset multiMatrix
+
+    for(int i=0;i<noOfRowsMat1;i++)
+    {
+        for(int j=0;j<noOfColsMat2;j++)
+        {
+            multiMatrix[i][j]=0+0i;
+        }
+    }
+
+    //matrix multiplication in operation
+    for(int row=0;row<noOfRowsMat1;row++)
+    {
+        for(int col=0;col<noOfColsMat2;col++)
+        {
+            for(int i=0;i<noOfColsMat1;i++)
+            {
+                multiMatrix[row][col] += mat1[row][i] * mat2[i][col];
+            }
+        }
+    }
+
+    return multiMatrix;
 }
 
+
+
+float _Complex RefractiveIndexCu(float lambda)
+{
+    float r = 0.4822 + (lambda-1305.26)*(0.5701-0.4822)/(1458.82-1305.26); //only this one
+    float im = 7.9111 + (lambda-1305.26)*(7.6694-7.9111)/(1458.82-1305.26); //only this one
+
+    return r+(im)*I;
+}
