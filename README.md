@@ -9,3 +9,5 @@ M=512 // spectrometer resolution %for VITE, its 512
 
 Output:
 correction_thickness // to be added to total thickness of VITE 8108
+
+TFCAlgo.cpp is the main algorithm implementation file.
