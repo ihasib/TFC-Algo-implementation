@@ -8,7 +8,7 @@ float WarpSignal( float lambda,float armLength,float polyThickness,float polyRef
 float _Complex** TransferFunctionPolyCu( float lambda,float polyThickness,float polyRefractiveIndex);
 float _Complex** matrixMultiplication(float _Complex** mat1, float _Complex** mat2, int noOfRowsMat1, int noOfColsMat1, int noOfRowsMat2, int noOfColsMat2);
 float _Complex RefractiveIndexCu(float lambda);
-
+void fft(valarray<complex<float> > &x);
 //#define MAX
 
 int main()
@@ -81,14 +81,90 @@ void TfcStart(float polyRefractiveIndex, float polyThickness, int spectroResolut
     {
         Fx[indx]=Fx[indx-1]+deltaFx;
     }
+    /*FILE *fy=fopen("Y.txt","w");
+    for(int i=0;i<spectroResolution;i++)
+    {
+        fprintf(fy,"Y[%d]=%f\t%f\n",i,Y[i],triangular[i]);
+    }
+    fclose(fy);
+    */
+    for(int i=0;i<spectroResolution;i++)
+    {
+        Y[i]=Y[i]*triangular[i];
+    }
+    //Y done
+    complex<float> *Ytemp;
+    Ytemp=new complex<float>[spectroResolution];
+    for(int i=0;i<spectroResolution;i++)
+    {
+        Ytemp[i]=Y[i]+0i;
+    }
+    valarray<complex<float> > YY(Ytemp,spectroResolution);
+    fft(YY);
 
+    //------Finds the biggest peak-------
 
-    FILE *fl=fopen("Fx.txt","w");
+    float magnitudeYY,realYY,imagYY;
+    realYY=YY[2].real();
+    imagYY=YY[2].imag();
+    magnitudeYY=(realYY*realYY)+(imagYY*imagYY);
+    float maxYY=magnitudeYY,maxIdx=2;
+
+    for(int i=2;i<spectroResolution/2;i++)
+    {
+        realYY=YY[i].real();
+        imagYY=YY[i].imag();
+
+        magnitudeYY=(realYY*realYY)+(imagYY*imagYY);
+        if(maxYY<magnitudeYY)
+        {
+            maxIdx=i;
+            maxYY=magnitudeYY;
+        }
+    }
+
+    cout<<maxIdx<<"\n";
+
+    float lny[3],x[3];
+    int lnyIdx=0;
+    for(int i=maxIdx-1;i<=maxIdx+1;i++)
+    {
+        x[lnyIdx]=Fx[i];
+        lny[lnyIdx++]=log(abs(YY[i]));
+    }
+
+    //x=Fx(Position-1:Position+1);
+    for(int i=0;i<lnyIdx;i++)
+    {
+        cout<<lny[i]<<" "<<x[i]<<endl;
+    }
+    float a =(x[2] * (lny[1] - lny[0]) + x[1] * (lny[0] - lny[2]) + x[0] * (lny[2] - lny[1]));
+    float b =(x[2]*x[2] * (lny[0] - lny[1]) + x[1]*x[1] * (lny[2] - lny[0]) + x[0]*x[0] * (lny[1] - lny[2]));
+    cout<<a<<" "<<b<<"\n";
+
+    float PeakPosition=-b/(2*a);
+    cout<<PeakPosition<<"\n";
+    // Pay attention here, this is how it must be implemented in the WaferCal
+    float correction_thickness=PeakPosition-armLength; // to be added to total thickness of VITE 8108
+    cout<<"\n\n"<<correction_thickness<<"\n";
+    printf("\n\n%.8f\n",correction_thickness);
+    //---------------
+    /*FILE *fyy=fopen("YY.txt","w");
+    for(int i=0;i<spectroResolution;i++)
+    {
+        fprintf(fyy,"Y[%d]\t=%f+%fi\n",i,YY[i].real(),YY[i].imag());
+    }
+    fclose(fyy);
+*/
+
+    /*FILE *fl=fopen("Fx.txt","w");
     for(int i=0;i<spectroResolution;i++)
     {
         fprintf(fl,"Fx[%d]=%lf\n",i,Fx[i]);
     }
-    fclose(fl);
+    fclose(fl);*/
+
+
 
     /*FILE *f=fopen("X_Y.txt","w");
     for(int i=0;i<spectroResolution;i++)
@@ -272,4 +348,48 @@ float _Complex RefractiveIndexCu(float lambda)
     float im = 7.9111 + (lambda-1305.26)*(7.6694-7.9111)/(1458.82-1305.26); //only this one
 
     return r+(im)*I;
+}
+
+void fft(valarray<complex<float> > &x)
+{
+	// DFT
+	unsigned int N = x.size(), k = N, n;
+	double thetaT = 3.14159265358979323846264338328L / N;
+	complex<float> phiT = complex<float>(cos(thetaT), -sin(thetaT)), T;
+	while (k > 1)
+	{
+		n = k;
+		k >>= 1;
+		phiT = phiT * phiT;
+		T = 1.0L;
+		for (unsigned int l = 0; l < k; l++)
+		{
+			for (unsigned int a = l; a < N; a += n)
+			{
+				unsigned int b = a + k;
+				complex<float> t = x[a] - x[b];
+				x[a] += x[b];
+				x[b] = t * T;
+			}
+			T *= phiT;
+		}
+	}
+	// Decimate
+	unsigned int m = (unsigned int)log2(N);
+	for (unsigned int a = 0; a < N; a++)
+	{
+		unsigned int b = a;
+		// Reverse bits
+		b = (((b & 0xaaaaaaaa) >> 1) | ((b & 0x55555555) << 1));
+		b = (((b & 0xcccccccc) >> 2) | ((b & 0x33333333) << 2));
+		b = (((b & 0xf0f0f0f0) >> 4) | ((b & 0x0f0f0f0f) << 4));
+		b = (((b & 0xff00ff00) >> 8) | ((b & 0x00ff00ff) << 8));
+		b = ((b >> 16) | (b << 16)) >> (32 - m);
+		if (b > a)
+		{
+			complex<float> t = x[a];
+			x[a] = x[b];
+			x[b] = t;
+		}
+	}
 }
