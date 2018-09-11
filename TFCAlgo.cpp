@@ -2,7 +2,9 @@
 #include<complex.h>
 using namespace std;
 
-void TfcStart(float polyRefractiveIndex, float polyThickness, int spectroResolution, float lambdaMax, float lambdaMin);
+
+//functions to implement
+void TfcStart(float polyRefractiveIndex, float polyThickness, int spectroResolution, float lambdaMax, float lambdaMin,float &correction_thickness);
 void WarpSignalGraph( float polyThickness,float armLength,int spectroResolution, float polyRefractiveIndex,float *X, float *Y, float lambdaMin, float lambdaMax );
 float WarpSignal( float lambda,float armLength,float polyThickness,float polyRefractiveIndex);
 float _Complex** TransferFunctionPolyCu( float lambda,float polyThickness,float polyRefractiveIndex);
@@ -19,13 +21,18 @@ int main()
     int M=512; // spectrometer resolution %for VITE, its 512
     float lambdaMax=1400;
     float lambdaMin=1220;
+    float correction_thickness;
 
-    TfcStart(n_poly,t,M,lambdaMax,lambdaMin);
+    TfcStart(n_poly,t,M,lambdaMax,lambdaMin,correction_thickness);
+    correction_thickness/=1000;//conversion to microns from nano
+    printf("%.8f\n",correction_thickness);// to be added to total thickness of VITE 8108
+    //Real_Corrected_Total_Thickness = 8108_Total_thickness + correction_thickness
 
     return 0;
 }
 
-void TfcStart(float polyRefractiveIndex, float polyThickness, int spectroResolution, float lambdaMax, float lambdaMin)
+//task: update correction_thickness variable after calculation done
+void TfcStart(float polyRefractiveIndex, float polyThickness, int spectroResolution, float lambdaMax, float lambdaMin,float &correction_thickness)
 {
     //Apodization matrix
     float *triangular;
@@ -45,7 +52,7 @@ void TfcStart(float polyRefractiveIndex, float polyThickness, int spectroResolut
     {
         //cout<<i<<" "<<value<<endl;
         triangular[i]=value;
-        value-=increment;   //511/  last index contain approximately zero but not actually 0
+        value-=increment;
     }
 
 
@@ -145,7 +152,7 @@ void TfcStart(float polyRefractiveIndex, float polyThickness, int spectroResolut
     float PeakPosition=-b/(2*a);
     cout<<PeakPosition<<"\n";
     // Pay attention here, this is how it must be implemented in the WaferCal
-    float correction_thickness=PeakPosition-armLength; // to be added to total thickness of VITE 8108
+    correction_thickness=PeakPosition-armLength; // to be added to total thickness of VITE 8108
     cout<<"\n\n"<<correction_thickness<<"\n";
     printf("\n\n%.8f\n",correction_thickness);
     //---------------
@@ -173,17 +180,18 @@ void TfcStart(float polyRefractiveIndex, float polyThickness, int spectroResolut
     }
     fclose(f);*/
 
-    FILE *f=fopen("K.txt","w");
+    /*FILE *f=fopen("K.txt","w");
     for(int i=0;i<spectroResolution;i++)
     {
         fprintf(f,"K[%d]=%.8lf\n",i,k[i]);
     }
-    fclose(f);
+    fclose(f);*/
     return;
 }
 
 
-//this function also should take input lambdaMin, lambdaMax from ini file
+//task: updates X and Y array
+//output: null
 void WarpSignalGraph( float polyThickness,float armLength,int spectroResolution, float polyRefractiveIndex,float *X, float *Y, float lambdaMin, float lambdaMax )
 {
     memset(X,0,spectroResolution);
@@ -194,7 +202,7 @@ void WarpSignalGraph( float polyThickness,float armLength,int spectroResolution,
     float deltak=(kmax-kmin)/(spectroResolution-1); // Wavenumber spacing
 
 
-    for(int i=0;i<spectroResolution;i++)
+    for(int i=0;i<spectroResolution;i++) //loops through the pixels of the spectrometer
     {
         X[i] = 1/(kmax-(i+1-1)*deltak); // K space X axis //since our's is 0 indexed
         Y[i] = WarpSignal( X[i],armLength,polyThickness,polyRefractiveIndex); // Intensity
@@ -204,7 +212,8 @@ void WarpSignalGraph( float polyThickness,float armLength,int spectroResolution,
 }
 
 
-
+//input: wavelength,arm length, polyimide thickness, polyimide refractive index
+//returns generated signal's real part
 float WarpSignal( float lambda,float armLength,float polyThickness,float polyRefractiveIndex)
 {
     float _Complex **T,Rtemp;
@@ -341,7 +350,8 @@ float _Complex** matrixMultiplication(float _Complex** mat1, float _Complex** ma
 }
 
 
-
+//input: wavelength
+//task : generating a Complex number with the wavelength
 float _Complex RefractiveIndexCu(float lambda)
 {
     float r = 0.4822 + (lambda-1305.26)*(0.5701-0.4822)/(1458.82-1305.26); //only this one
@@ -350,11 +360,14 @@ float _Complex RefractiveIndexCu(float lambda)
     return r+(im)*I;
 }
 
+//input: complex floating number array
+//task : update x array after applying fft on the values of x array
+
 void fft(valarray<complex<float> > &x)
 {
 	// DFT
 	unsigned int N = x.size(), k = N, n;
-	double thetaT = 3.14159265358979323846264338328L / N;
+	float thetaT = 3.14159265358979323846264338328L / N;
 	complex<float> phiT = complex<float>(cos(thetaT), -sin(thetaT)), T;
 	while (k > 1)
 	{
